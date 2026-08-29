@@ -3,6 +3,7 @@ import 'dart:math';
 import '../database/database_service.dart';
 import '../analysis/daily_score.dart';
 import '../analysis/mental_state_service.dart';
+import '../services/llm_service.dart';
 
 class AnalysisScreen extends StatefulWidget {
   const AnalysisScreen({super.key});
@@ -13,6 +14,7 @@ class AnalysisScreen extends StatefulWidget {
 
 class _AnalysisScreenState extends State<AnalysisScreen> {
   bool isLoading = true;
+  bool isWeeklyLoading = false;
   List<Map<String, dynamic>> rawData = [];
   List<double> scores = [];
   
@@ -20,6 +22,7 @@ class _AnalysisScreenState extends State<AnalysisScreen> {
   double stdDev = 0;
   double trendSlope = 0;
   Map<String, double> mentalState = {};
+  String weeklySummary = "";
 
   @override
   void initState() {
@@ -48,11 +51,59 @@ class _AnalysisScreenState extends State<AnalysisScreen> {
         rawData = data;
         scores = calculatedScores;
         isLoading = false;
+        isWeeklyLoading = true;
       });
+
+      // 3. Generate Structured Weekly Summary via LLM
+      _generateWeeklySummary(chronologicalData, calculatedScores);
     } else {
       setState(() {
         isLoading = false;
       });
+    }
+  }
+
+  Future<void> _generateWeeklySummary(List<Map<String, dynamic>> data, List<double> calculatedScores) async {
+    // Construct behavioral history for the prompt
+    String historyText = data.map((d) {
+      int idx = data.indexOf(d);
+      return "Day ${idx + 1}: Sleep: ${d['sleep']}h, Work: ${d['work']}h, Study: ${d['study']}h, Screen: ${d['screenTime']}h, Score: ${calculatedScores[idx].toStringAsFixed(1)}/10";
+    }).join("\n");
+
+    String prompt = """
+Generate a short, structured weekly behavioral summary based on this data:
+$historyText
+
+Overall average stability: ${averageScore.toStringAsFixed(1)}/10
+Mental State Estimates (Latest): Stress ${mentalState['Stress']?.toStringAsFixed(0)}%, Anxiety ${mentalState['Anxiety']?.toStringAsFixed(0)}%, Depression ${mentalState['Depression']?.toStringAsFixed(0)}%
+
+Structure your response as exactly three bullet points:
+1. WHAT IMPROVED: (1 sentence about a positive trend or consistent metric)
+2. WHAT DECLINED: (1 sentence about a metric needing attention or a downward trend)
+3. FOCUS AREA: (1 specific, actionable suggestion for next week)
+
+Keep it supportive, brief, and medically grounded.
+""";
+
+    try {
+      final response = await LLMService.sendChatMessage(
+        userMessage: prompt,
+        history: [],
+      );
+      
+      if (mounted) {
+        setState(() {
+          weeklySummary = response.replyText;
+          isWeeklyLoading = false;
+        });
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          weeklySummary = "Unable to generate weekly summary. Please check your connection.";
+          isWeeklyLoading = false;
+        });
+      }
     }
   }
 
@@ -100,11 +151,42 @@ class _AnalysisScreenState extends State<AnalysisScreen> {
       body: isLoading
           ? const Center(child: CircularProgressIndicator())
           : rawData.length < 5
-              ? const Center(child: Text("Insufficient data for detailed analysis"))
+              ? const Center(
+                  child: Padding(
+                    padding: EdgeInsets.all(30.0),
+                    child: Text(
+                      "Insufficient data for detailed analysis. Please log at least 5 days of behavior.",
+                      textAlign: TextAlign.center,
+                      style: TextStyle(fontSize: 16, color: Colors.grey),
+                    ),
+                  ),
+                )
               : SingleChildScrollView(
                   padding: const EdgeInsets.all(16),
                   child: Column(
                     children: [
+                      _buildReportSection(
+                        "Structured Weekly Insight",
+                        Icons.auto_awesome,
+                        Colors.deepPurple,
+                        isWeeklyLoading
+                            ? const Center(
+                                child: Padding(
+                                  padding: EdgeInsets.all(20.0),
+                                  child: Column(
+                                    children: [
+                                      SizedBox(width: 24, height: 24, child: CircularProgressIndicator(strokeWidth: 2)),
+                                      SizedBox(height: 12),
+                                      Text("AI is analyzing your week...", style: TextStyle(fontSize: 14, color: Colors.grey)),
+                                    ],
+                                  ),
+                                ),
+                              )
+                            : Text(
+                                weeklySummary,
+                                style: const TextStyle(fontSize: 15, height: 1.6),
+                              ),
+                      ),
                       _buildReportSection(
                         "Overall Summary",
                         Icons.summarize,
@@ -198,7 +280,7 @@ class _AnalysisScreenState extends State<AnalysisScreen> {
       obs += "The data signifies significant behavioral dysregulation. ";
     }
 
-    if (mentalState['Stress']! > 60) {
+    if ((mentalState['Stress'] ?? 0) > 60) {
       obs += "Physiological stress markers are elevated, likely correlated with sleep hygiene deviations or excessive cognitive load (screen time). ";
     }
     
@@ -207,7 +289,7 @@ class _AnalysisScreenState extends State<AnalysisScreen> {
 
   List<String> _getRecommendations() {
     List<String> recs = [];
-    final latest = rawData.first;
+    final latest = rawData.isNotEmpty ? rawData.first : {};
     
     if ((latest['sleep'] ?? 0) < 7) recs.add("Increase sleep duration to 7-8 hours consistently.");
     if ((latest['screenTime'] ?? 0) > 6) recs.add("Reduce digital exposure, especially 1 hour before sleep.");

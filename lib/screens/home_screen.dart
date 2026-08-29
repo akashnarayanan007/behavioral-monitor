@@ -5,7 +5,9 @@ import 'dashboard_screen.dart';
 import 'mood_input_screen.dart';
 import 'usage_permission_screen.dart';
 import 'calculation_screen.dart';
+import 'chat_screen.dart';
 import '../database/database_service.dart';
+import '../services/llm_service.dart'; // Import LLM Service for testing
 
 class HomeScreen extends StatelessWidget {
   const HomeScreen({super.key});
@@ -146,7 +148,10 @@ class HomeScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      backgroundColor: Colors.white, // Ensure background is visible
       body: Container(
+        width: double.infinity, // Explicitly force full width
+        height: double.infinity, // Explicitly force full height
         decoration: BoxDecoration(
           gradient: LinearGradient(
             begin: Alignment.topCenter,
@@ -182,13 +187,13 @@ class HomeScreen extends StatelessWidget {
                     ),
                   ],
                 ),
-                child: const Column(
+                child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Row(
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
-                        Text(
+                        const Text(
                           "Behavior Monitor",
                           style: TextStyle(
                             fontSize: 28,
@@ -196,11 +201,34 @@ class HomeScreen extends StatelessWidget {
                             color: Colors.white,
                           ),
                         ),
-                        Icon(Icons.spa, color: Colors.white, size: 32),
+                        Row(
+                          children: [
+                            // 🐞 TEMPORARY DEBUG BUTTON
+                            IconButton(
+                              icon: const Icon(Icons.bug_report, color: Colors.white),
+                              onPressed: () async {
+                                debugPrint("--- 🧪 STARTING LLM API TEST ---");
+                                try {
+                                  final response = await LLMService.sendChatMessage(
+                                    userMessage: "I'm really stressed about my exams",
+                                    history: [],
+                                  );
+                                  debugPrint("Reply: ${response.replyText}");
+                                  debugPrint("Category: ${response.category}");
+                                  debugPrint("Urgency: ${response.urgencyLevel}");
+                                  debugPrint("--- ✅ TEST SUCCESSFUL ---");
+                                } catch (e) {
+                                  debugPrint("--- ❌ TEST FAILED: $e ---");
+                                }
+                              },
+                            ),
+                            const Icon(Icons.spa, color: Colors.white, size: 32),
+                          ],
+                        ),
                       ],
                     ),
-                    SizedBox(height: 8),
-                    Text(
+                    const SizedBox(height: 8),
+                    const Text(
                       "Track your mental wellness",
                       style: TextStyle(
                         fontSize: 16,
@@ -231,6 +259,14 @@ class HomeScreen extends StatelessWidget {
                       Icons.emoji_emotions,
                       const MoodInputScreen(),
                       gradientColors: [Colors.orange.shade400, Colors.orange.shade700],
+                    ),
+                    featureCard(
+                      context,
+                      "Stress Support Chat",
+                      "Talk about how you're feeling",
+                      Icons.chat_bubble_outline,
+                      const ChatScreen(),
+                      gradientColors: [Colors.green.shade400, Colors.green.shade700],
                     ),
                     featureCard(
                       context,

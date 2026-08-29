@@ -46,10 +46,80 @@ class DatabaseService {
     );
   }
 
+  // ✅ FETCH RECENT ENTRIES (FLEXIBLE LIMIT)
+  static Future<List<Map<String, dynamic>>> getRecentEntries(int count) async {
+    final db = await database;
+    return await db.query(
+      'behavior',
+      orderBy: 'id DESC',
+      limit: count,
+    );
+  }
+
+  // ✅ DELETE SPECIFIC ENTRY
+  static Future<void> deleteEntry(int id) async {
+    final db = await database;
+    await db.delete(
+      'behavior',
+      where: 'id = ?',
+      whereArgs: [id],
+    );
+  }
+
   // ✅ FETCH TOTAL COUNT
   static Future<int> getCount() async {
     final db = await database;
     return Sqflite.firstIntValue(await db.rawQuery('SELECT COUNT(*) FROM behavior')) ?? 0;
+  }
+
+  // --- SESSION SUMMARY METHODS ---
+
+  // ✅ INSERT SESSION SUMMARY (Updated to return ID)
+  static Future<int> insertSummary(String category, String summaryText) async {
+    final db = await database;
+    return await db.insert('summaries', {
+      'category': category,
+      'summary_text': summaryText,
+      'timestamp': DateTime.now().toIso8601String(),
+      'rating': 0, // Default rating
+    });
+  }
+
+  // ✅ UPDATE SESSION RATING
+  static Future<void> updateSummaryRating(int id, int rating) async {
+    final db = await database;
+    await db.update(
+      'summaries',
+      {'rating': rating},
+      where: 'id = ?',
+      whereArgs: [id],
+    );
+  }
+
+  // ✅ FETCH ALL SUMMARIES
+  static Future<List<Map<String, dynamic>>> getAllSummaries() async {
+    final db = await database;
+    return await db.query('summaries', orderBy: 'timestamp DESC');
+  }
+
+  // ✅ DELETE SESSION SUMMARY
+  static Future<void> deleteSessionSummary(int id) async {
+    final db = await database;
+    await db.delete('summaries',
+      where: 'id = ?',
+      whereArgs: [id],
+    );
+  }
+
+  // ✅ UPDATE AI INTERPRETATION
+  static Future<void> updateAIInterpretation(int id, String text) async {
+    final db = await database;
+    await db.update(
+      'behavior',
+      {'ai_interpretation': text},
+      where: 'id = ?',
+      whereArgs: [id],
+    );
   }
 
   // ✅ DATABASE INSTANCE
@@ -65,7 +135,7 @@ class DatabaseService {
 
     return await openDatabase(
       path,
-      version: 1,
+      version: 4, // Incremented version to add ai_interpretation
       onCreate: (db, version) async {
         await db.execute('''
 CREATE TABLE behavior(
@@ -81,9 +151,40 @@ CREATE TABLE behavior(
   calls INTEGER,
   maxCallDuration REAL,
   mood INTEGER,
-  date TEXT
+  date TEXT,
+  ai_interpretation TEXT
 )
 ''');
+        await db.execute('''
+CREATE TABLE summaries(
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  category TEXT,
+  summary_text TEXT,
+  timestamp TEXT,
+  rating INTEGER DEFAULT 0
+)
+''');
+      },
+      onUpgrade: (db, oldVersion, newVersion) async {
+        if (oldVersion < 2) {
+          await db.execute('''
+CREATE TABLE summaries(
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  category TEXT,
+  summary_text TEXT,
+  timestamp TEXT,
+  rating INTEGER DEFAULT 0
+)
+''');
+        }
+        if (oldVersion < 3) {
+          try {
+            await db.execute('ALTER TABLE summaries ADD COLUMN rating INTEGER DEFAULT 0');
+          } catch (e) {}
+        }
+        if (oldVersion < 4) {
+          await db.execute('ALTER TABLE behavior ADD COLUMN ai_interpretation TEXT');
+        }
       },
     );
   }
@@ -91,6 +192,7 @@ CREATE TABLE behavior(
   static Future<void> clearAllData() async {
     final db = await database;
     await db.delete('behavior');
+    await db.delete('summaries');
   }
 
   // ✅ FACTORY RESET LOGIC

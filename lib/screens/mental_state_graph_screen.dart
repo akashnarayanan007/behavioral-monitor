@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:fl_chart/fl_chart.dart';
 import '../database/database_service.dart';
 import '../analysis/mental_state_service.dart';
+import '../services/llm_service.dart';
+import 'chat_screen.dart';
 
 class MentalStateGraphScreen extends StatefulWidget {
   const MentalStateGraphScreen({super.key});
@@ -13,6 +15,8 @@ class MentalStateGraphScreen extends StatefulWidget {
 class _MentalStateGraphScreenState extends State<MentalStateGraphScreen> {
   Map<String, double>? mentalStateScores;
   bool isLoading = true;
+  String? supportiveNote;
+  bool isNoteLoading = false;
 
   @override
   void initState() {
@@ -27,11 +31,59 @@ class _MentalStateGraphScreenState extends State<MentalStateGraphScreen> {
       setState(() {
         mentalStateScores = scores;
         isLoading = false;
+        isNoteLoading = true;
       });
+      _generateSupportiveNote(scores);
     } else {
       setState(() {
         isLoading = false;
       });
+    }
+  }
+
+  Future<void> _generateSupportiveNote(Map<String, double> scores) async {
+    // Find the highest score
+    String highestLabel = "Stress";
+    double highestValue = scores['Stress'] ?? 0;
+    
+    scores.forEach((key, value) {
+      if (value > highestValue) {
+        highestValue = value;
+        highestLabel = key;
+      }
+    });
+
+    final prompt = """
+The user has the following mental state levels:
+Stress: ${scores['Stress']?.toStringAsFixed(1)}%
+Anxiety: ${scores['Anxiety']?.toStringAsFixed(1)}%
+Depression: ${scores['Depression']?.toStringAsFixed(1)}%
+
+The highest concern is $highestLabel. 
+Please provide a 2-3 sentence supportive note. 
+Include one gentle, actionable suggestion related to $highestLabel.
+Keep the tone supportive and empathetic. 
+Remind them gently that this is an automated estimation and not a clinical diagnosis.
+""";
+
+    try {
+      final response = await LLMService.sendChatMessage(
+        userMessage: prompt,
+        history: [],
+      );
+      if (mounted) {
+        setState(() {
+          supportiveNote = response.replyText;
+          isNoteLoading = false;
+        });
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          supportiveNote = "I'm here to support you. Let's work on maintaining a steady routine to help manage your wellness.";
+          isNoteLoading = false;
+        });
+      }
     }
   }
 
@@ -92,7 +144,7 @@ class _MentalStateGraphScreenState extends State<MentalStateGraphScreen> {
                               topTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
                               rightTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
                             ),
-                            gridData: FlGridData(show: true, drawVerticalLine: false, horizontalInterval: 20),
+                            gridData: const FlGridData(show: true, drawVerticalLine: false, horizontalInterval: 20),
                             borderData: FlBorderData(show: false),
                             barGroups: [
                               _makeBarGroup(0, mentalStateScores!['Stress']!),
@@ -115,6 +167,8 @@ class _MentalStateGraphScreenState extends State<MentalStateGraphScreen> {
                       ),
                       
                       const SizedBox(height: 40),
+                      _buildSupportiveNoteSection(),
+                      const SizedBox(height: 20),
                       _buildInterpretationCard(),
                     ],
                   ),
@@ -143,6 +197,59 @@ class _MentalStateGraphScreenState extends State<MentalStateGraphScreen> {
       children: [
         Text(level, style: TextStyle(fontWeight: FontWeight.bold, color: _getBarColor(score), fontSize: 13)),
       ],
+    );
+  }
+
+  Widget _buildSupportiveNoteSection() {
+    return Card(
+      elevation: 3,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
+      color: const Color(0xFF4A90E2).withOpacity(0.05),
+      child: Padding(
+        padding: const EdgeInsets.all(20),
+        child: Column(
+          children: [
+            if (isNoteLoading)
+              const Center(child: CircularProgressIndicator(strokeWidth: 2))
+            else ...[
+              Text(
+                supportiveNote ?? "",
+                textAlign: TextAlign.center,
+                style: const TextStyle(fontSize: 15, fontStyle: FontStyle.italic, color: Colors.black87),
+              ),
+              const SizedBox(height: 20),
+              ElevatedButton.icon(
+                onPressed: () {
+                  String highestLabel = "Stress";
+                  double highestValue = mentalStateScores?['Stress'] ?? 0;
+                  mentalStateScores?.forEach((key, value) {
+                    if (value > highestValue) {
+                      highestValue = value;
+                      highestLabel = key;
+                    }
+                  });
+                  
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (context) => ChatScreen(
+                        initialMessage: "I'd like to talk more about my current $highestLabel levels.",
+                      ),
+                    ),
+                  );
+                },
+                icon: const Icon(Icons.chat_bubble_outline),
+                label: const Text("Talk about this"),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: const Color(0xFF4A90E2),
+                  foregroundColor: Colors.white,
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                ),
+              ),
+            ]
+          ],
+        ),
+      ),
     );
   }
 

@@ -3,6 +3,7 @@ import 'package:fl_chart/fl_chart.dart';
 import 'dart:math';
 import '../database/database_service.dart';
 import '../analysis/daily_score.dart';
+import '../services/llm_service.dart';
 
 class GraphScreen extends StatefulWidget {
   final List<FlSpot>? graphPoints;
@@ -16,8 +17,9 @@ class GraphScreen extends StatefulWidget {
 class _GraphScreenState extends State<GraphScreen> {
   List<FlSpot> points = [];
   List<FlSpot> trendLinePoints = [];
-  List<double> stdDevValues = [];
   bool isLoading = true;
+  String narrativeSummary = "";
+  bool isNarrativeLoading = true;
 
   double mean = 0;
   double stdDev = 0;
@@ -30,7 +32,8 @@ class _GraphScreenState extends State<GraphScreen> {
   }
 
   Future<void> _loadData() async {
-    final data = await DatabaseService.getLast10();
+    // Fetch last 14 days for broader trend analysis
+    final data = await DatabaseService.getRecentEntries(14);
     final chronologicalData = data.reversed.toList();
     
     List<FlSpot> loadedPoints = [];
@@ -41,13 +44,11 @@ class _GraphScreenState extends State<GraphScreen> {
     }
 
     if (loadedPoints.length >= 2) {
-      // 3. Variability Analysis
       List<double> scores = loadedPoints.map((p) => p.y).toList();
       mean = scores.reduce((a, b) => a + b) / scores.length;
       double variance = scores.map((x) => pow(x - mean, 2)).reduce((a, b) => a + b) / scores.length;
       stdDev = sqrt(variance);
 
-      // Trend Line (3-day SMA) and Trend Slope
       List<FlSpot> trendPoints = [];
       for (int i = 0; i < loadedPoints.length; i++) {
         double sum = 0;
@@ -72,6 +73,45 @@ class _GraphScreenState extends State<GraphScreen> {
       points = loadedPoints;
       isLoading = false;
     });
+
+    if (data.isNotEmpty) {
+      _fetchNarrativeSummary(data);
+    }
+  }
+
+  Future<void> _fetchNarrativeSummary(List<Map<String, dynamic>> rawData) async {
+    String dataSummary = rawData.reversed.map((d) {
+      final score = DailyScore.compute(d).toStringAsFixed(1);
+      return "Date: ${d['date'] ?? 'N/A'}, Score: $score/10, Sleep: ${d['sleep']}h, Screen: ${d['screenTime']}h";
+    }).join("\n");
+
+    final String prompt = """
+    Please provide a 2-3 sentence narrative summary of my behavioral stability trend based on these 14-day logs:
+    $dataSummary
+    
+    Explain the trend simply (improving, declining, or stable). 
+    If there are sharp drops, mention which logs they coincide with and highlight likely causes like sleep or screen time.
+    """;
+
+    try {
+      final response = await LLMService.sendChatMessage(
+        userMessage: prompt,
+        history: [],
+      );
+      if (mounted) {
+        setState(() {
+          narrativeSummary = response.replyText;
+          isNarrativeLoading = false;
+        });
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          narrativeSummary = "Trend narrative is currently unavailable.";
+          isNarrativeLoading = false;
+        });
+      }
+    }
   }
 
   String _generateClinicalReport() {
@@ -89,41 +129,9 @@ class _GraphScreenState extends State<GraphScreen> {
         ? "significant behavioral variability" 
         : "high consistency";
 
-    bool hasSuddenDrop = false;
-    for (int i = 1; i < points.length; i++) {
-      if (points[i-1].y - points[i].y > 2.5) {
-        hasSuddenDrop = true;
-        break;
-      }
-    }
-
-    String riskLevel = "LOW";
-    if (mean < 4 || trendSlope < -0.2 || (stdDev > 2.0 && mean < 6)) {
-      riskLevel = "HIGH";
-    } else if (mean < 6 || trendSlope < -0.05 || stdDev > 1.2) {
-      riskLevel = "MODERATE";
-    }
-
     String report = "Clinical Observation:\n";
     report += "The longitudinal assessment indicates $trendDescription. ";
     report += "Analysis of standard deviation (σ = ${stdDev.toStringAsFixed(2)}) reflects $consistency. ";
-    if (hasSuddenDrop) {
-      report += "Observation reveals acute pattern deviations (sudden drops) which may signify transient stressors or sleep disruptions. ";
-    }
-
-    report += "\n\nInterpretation:\n";
-    if (riskLevel == "HIGH") {
-      report += "The observed data signifies critical behavioral instability. Such a trajectory is frequently correlated with severe sleep deprivation, routine fragmentation, or excessive digital exposure, potentially impacting mental resilience.";
-    } else if (riskLevel == "MODERATE") {
-      report += "The data suggests moderate fluctuation in behavioral regulation. While not critical, the current variability indicates potential for further destabilization if routine adherence is not prioritized.";
-    } else {
-      report += "The patient demonstrates resilient behavioral regulation. The stability path is consistent with healthy sleep hygiene and structured daily habits.";
-    }
-
-    report += "\n\nRisk Assessment: $riskLevel RISK\n";
-    if (riskLevel != "LOW") {
-      report += "⚠️ Pattern indicates potential behavioral instability. Monitoring and targeted intervention recommended.";
-    }
 
     return report;
   }
@@ -166,50 +174,19 @@ class _GraphScreenState extends State<GraphScreen> {
                               maxY: 10,
                               minX: 0,
                               maxX: points.length.toDouble() - 1,
-                              lineTouchData: LineTouchData(
-                                touchTooltipData: LineTouchTooltipData(
-                                  tooltipBgColor: Colors.blueGrey.withOpacity(0.9),
-                                  getTooltipItems: (touchedSpots) {
-                                    return touchedSpots.map((spot) {
-                                      final isTrend = spot.barIndex == 1;
-                                      return LineTooltipItem(
-                                        '${isTrend ? "Trend" : "Score"}: ${spot.y.toStringAsFixed(2)}',
-                                        TextStyle(
-                                          color: isTrend ? Colors.orangeAccent : Colors.white,
-                                          fontWeight: FontWeight.bold,
-                                        ),
-                                      );
-                                    }).toList();
-                                  },
-                                ),
-                              ),
+                              lineTouchData: const LineTouchData(enabled: true),
                               gridData: const FlGridData(show: true, drawVerticalLine: false),
                               titlesData: FlTitlesData(
                                 show: true,
                                 rightTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
                                 topTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
                                 bottomTitles: AxisTitles(
-                                  axisNameWidget: const Text("Timeline (Days)", style: TextStyle(fontSize: 12)),
                                   sideTitles: SideTitles(
                                     showTitles: true,
-                                    interval: 1,
-                                    getTitlesWidget: (value, meta) => Text(
-                                      "T-${(points.length - 1 - value.toInt())}",
-                                      style: const TextStyle(fontSize: 10, color: Colors.grey),
-                                    ),
+                                    getTitlesWidget: (value, meta) => Text("T-${(points.length - 1 - value.toInt())}", style: const TextStyle(fontSize: 10, color: Colors.grey)),
                                   ),
                                 ),
-                                leftTitles: AxisTitles(
-                                  axisNameWidget: const Text("Score", style: TextStyle(fontSize: 12)),
-                                  sideTitles: const SideTitles(showTitles: true, interval: 2, reservedSize: 30),
-                                ),
-                              ),
-                              rangeAnnotations: RangeAnnotations(
-                                horizontalRangeAnnotations: [
-                                  HorizontalRangeAnnotation(y1: 0, y2: 3, color: Colors.red.withOpacity(0.05)),
-                                  HorizontalRangeAnnotation(y1: 3, y2: 7, color: Colors.orange.withOpacity(0.05)),
-                                  HorizontalRangeAnnotation(y1: 7, y2: 10, color: Colors.green.withOpacity(0.05)),
-                                ],
+                                leftTitles: const AxisTitles(sideTitles: SideTitles(showTitles: true, interval: 2, reservedSize: 30)),
                               ),
                               borderData: FlBorderData(show: true, border: Border.all(color: Colors.grey.withOpacity(0.2))),
                               lineBarsData: [
@@ -218,18 +195,7 @@ class _GraphScreenState extends State<GraphScreen> {
                                   isCurved: true,
                                   barWidth: 3,
                                   gradient: const LinearGradient(colors: [Colors.blue, Colors.blueAccent]),
-                                  dotData: FlDotData(
-                                    show: true,
-                                    getDotPainter: (spot, percent, barData, index) {
-                                      bool isAnomaly = index > 0 && (points[index-1].y - spot.y).abs() > 2.5;
-                                      return FlDotCirclePainter(
-                                        radius: isAnomaly ? 6 : 4,
-                                        color: isAnomaly ? Colors.red : Colors.blue,
-                                        strokeWidth: 2,
-                                        strokeColor: Colors.white,
-                                      );
-                                    },
-                                  ),
+                                  dotData: const FlDotData(show: true),
                                 ),
                                 if (trendLinePoints.isNotEmpty)
                                   LineChartBarData(
@@ -248,7 +214,17 @@ class _GraphScreenState extends State<GraphScreen> {
                         const SizedBox(height: 30),
                         _buildLegend(),
                         
-                        const SizedBox(height: 40),
+                        const SizedBox(height: 30),
+                        _buildReportSection(
+                          "AI Narrative Summary",
+                          Icons.auto_awesome,
+                          Colors.indigo,
+                          isNarrativeLoading
+                            ? const Center(child: Padding(padding: EdgeInsets.all(10), child: CircularProgressIndicator(strokeWidth: 2)))
+                            : Text(narrativeSummary, style: const TextStyle(fontSize: 14, height: 1.5, fontStyle: FontStyle.italic)),
+                        ),
+                        
+                        const SizedBox(height: 20),
                         _buildClinicalReportCard(),
                         
                         const SizedBox(height: 20),
@@ -259,28 +235,42 @@ class _GraphScreenState extends State<GraphScreen> {
     );
   }
 
+  Widget _buildReportSection(String title, IconData icon, Color color, Widget content) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        color: color.withOpacity(0.05),
+        borderRadius: BorderRadius.circular(15),
+        border: Border.all(color: color.withOpacity(0.1)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Icon(icon, color: color, size: 24),
+              const SizedBox(width: 10),
+              Text(
+                title,
+                style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: color),
+              ),
+            ],
+          ),
+          const Divider(height: 25),
+          content,
+        ],
+      ),
+    );
+  }
+
   Widget _buildLegend() {
-    return Column(
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.center,
       children: [
-        Row(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            _legendItem(Colors.blue, "Stability Index"),
-            const SizedBox(width: 20),
-            _legendItem(Colors.orange.withOpacity(0.6), "Trend Line (SMA)", isDash: true),
-          ],
-        ),
-        const SizedBox(height: 10),
-        Row(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            _legendItem(Colors.green.withOpacity(0.2), "Healthy"),
-            const SizedBox(width: 10),
-            _legendItem(Colors.orange.withOpacity(0.2), "Moderate"),
-            const SizedBox(width: 10),
-            _legendItem(Colors.red.withOpacity(0.2), "High Risk"),
-          ],
-        ),
+        _legendItem(Colors.blue, "Stability Index"),
+        const SizedBox(width: 20),
+        _legendItem(Colors.orange.withOpacity(0.6), "Trend Line", isDash: true),
       ],
     );
   }
@@ -288,15 +278,7 @@ class _GraphScreenState extends State<GraphScreen> {
   Widget _legendItem(Color color, String label, {bool isDash = false}) {
     return Row(
       children: [
-        Container(
-          width: 16,
-          height: 3,
-          decoration: BoxDecoration(
-            color: isDash ? null : color,
-            borderRadius: BorderRadius.circular(2),
-          ),
-          child: isDash ? const Center(child: Text("- - -", style: TextStyle(color: Colors.orange, fontSize: 8, fontWeight: FontWeight.bold))) : null,
-        ),
+        Container(width: 16, height: 3, color: isDash ? null : color),
         const SizedBox(width: 6),
         Text(label, style: const TextStyle(fontSize: 11, color: Colors.black87)),
       ],
@@ -304,38 +286,11 @@ class _GraphScreenState extends State<GraphScreen> {
   }
 
   Widget _buildClinicalReportCard() {
-    return Container(
-      padding: const EdgeInsets.all(20),
-      decoration: BoxDecoration(
-        color: Colors.blueGrey.withOpacity(0.05),
-        borderRadius: BorderRadius.circular(15),
-        border: Border.all(color: Colors.blueGrey.withOpacity(0.1)),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          const Row(
-            children: [
-              Icon(Icons.assignment_ind, color: Colors.blueGrey, size: 24),
-              SizedBox(width: 10),
-              Text(
-                "Clinical Observation Report",
-                style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.blueGrey),
-              ),
-            ],
-          ),
-          const Divider(height: 25),
-          Text(
-            _generateClinicalReport(),
-            style: const TextStyle(fontSize: 14, color: Colors.black87, height: 1.6),
-          ),
-          const SizedBox(height: 20),
-          const Text(
-            "* This report is generated based on automated behavioral monitoring and is intended for informational reference only.",
-            style: TextStyle(fontSize: 11, color: Colors.grey, fontStyle: FontStyle.italic),
-          ),
-        ],
-      ),
+    return _buildReportSection(
+      "Statistical Insights",
+      Icons.analytics_outlined,
+      Colors.blueGrey,
+      Text(_generateClinicalReport(), style: const TextStyle(fontSize: 14, height: 1.5)),
     );
   }
 }

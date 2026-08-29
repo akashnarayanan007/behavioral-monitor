@@ -3,6 +3,8 @@ import '../database/database_service.dart';
 import '../analysis/hankel_matrix.dart';
 import '../analysis/dmd_analysis.dart';
 import '../analysis/daily_score.dart';
+import '../services/llm_service.dart';
+import '../analysis/mental_state_service.dart';
 
 class MentalCalculationScreen extends StatefulWidget {
   const MentalCalculationScreen({super.key});
@@ -17,6 +19,8 @@ class _MentalCalculationScreenState extends State<MentalCalculationScreen> {
   double variation = 0;
   double mentalHealthScore = 0;
   bool isLoading = true;
+  String plainLanguageExplanation = "";
+  bool isExplaining = true;
 
   @override
   void initState() {
@@ -39,11 +43,10 @@ class _MentalCalculationScreenState extends State<MentalCalculationScreen> {
         hankel = HankelMatrix.buildHankel(scoreVectors);
         v = DMDAnalysis.computeStability(hankel);
         
-        // Corrected calculation logic using weighted 3-day average and trend factor
         int n = scores.length;
-        double s1 = scores[n - 3]; // 2 days ago
-        double s2 = scores[n - 2]; // Yesterday
-        double s3 = scores[n - 1]; // Today
+        double s1 = scores[n - 3];
+        double s2 = scores[n - 2];
+        double s3 = scores[n - 1];
         
         double weightedAvg = (s1 * 0.2) + (s2 * 0.3) + (s3 * 0.5);
         double trendFactor = (s3 - s1) * 0.15;
@@ -58,10 +61,47 @@ class _MentalCalculationScreenState extends State<MentalCalculationScreen> {
         mentalHealthScore = mhScore;
         isLoading = false;
       });
+
+      if (scores.length >= 3) {
+        _fetchPlainLanguageExplanation(mhScore, v);
+      }
     } else {
       setState(() {
         isLoading = false;
       });
+    }
+  }
+
+  Future<void> _fetchPlainLanguageExplanation(double score, double varVal) async {
+    final double eigenvalue = (1.0 - (varVal / 10)).clamp(0.0, 1.0);
+    
+    final String prompt = """
+Please explain my mental health calculation results to me in 2-3 simple sentences.
+My current Stability Index is ${score.toStringAsFixed(1)}/10.
+The system eigenvalue (which measures how consistent my routine is) is ${eigenvalue.toStringAsFixed(4)}.
+Translate these math terms into what they mean for my actual life and wellness. 
+Do not use technical jargon.
+""";
+
+    try {
+      final response = await LLMService.sendChatMessage(
+        userMessage: prompt,
+        history: [],
+      );
+
+      if (mounted) {
+        setState(() {
+          plainLanguageExplanation = response.replyText;
+          isExplaining = false;
+        });
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          plainLanguageExplanation = "Unable to generate explanation at this time.";
+          isExplaining = false;
+        });
+      }
     }
   }
 
@@ -159,6 +199,26 @@ class _MentalCalculationScreenState extends State<MentalCalculationScreen> {
                                 style: const TextStyle(fontSize: 24, fontWeight: FontWeight.bold, color: Colors.green),
                               ),
                             ),
+                          ),
+                          _buildSection(
+                            "7. Plain Language Explanation",
+                            isExplaining
+                                ? const Center(
+                                    child: Padding(
+                                      padding: EdgeInsets.all(20.0),
+                                      child: Column(
+                                        children: [
+                                          SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2)),
+                                          SizedBox(height: 10),
+                                          Text("AI is translating math to English...", style: TextStyle(fontSize: 12, color: Colors.grey)),
+                                        ],
+                                      ),
+                                    ),
+                                  )
+                                : Text(
+                                    plainLanguageExplanation,
+                                    style: const TextStyle(fontSize: 15, height: 1.5, fontStyle: FontStyle.italic),
+                                  ),
                           ),
                           const SizedBox(height: 20),
                         ],

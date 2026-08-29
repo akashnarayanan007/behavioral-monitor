@@ -1,46 +1,53 @@
 import 'package:flutter/material.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'screens/home_screen.dart';
+import 'screens/consent_screen.dart';
 import 'services/notification_service.dart';
 import 'screens/mood_input_screen.dart';
-import 'package:sqflite/sqflite.dart';
-import 'package:path/path.dart';
 
-Future<void> deleteOldDB() async {
-  final dbPath = await getDatabasesPath();
-  final path = join(dbPath, 'behavior.db');
-  await deleteDatabase(path);
-}
-
-final GlobalKey<NavigatorState> navigatorKey =
-GlobalKey<NavigatorState>();
+final GlobalKey<NavigatorState> navigatorKey = GlobalKey<NavigatorState>();
 
 void main() async {
+  debugPrint("--- 🚀 APP STARTING ---");
+  
+  // 1. Mandatory for async initialization
   WidgetsFlutterBinding.ensureInitialized();
+  debugPrint("--- 🟢 Widgets Binding Initialized ---");
 
-  // 🔥 TEMPORARY (run once, then remove)
+  // 2. Check for User Consent
+  debugPrint("--- 🔍 Fetching SharedPreferences ---");
+  final prefs = await SharedPreferences.getInstance();
+  final bool hasConsented = prefs.getBool('hasConsented') ?? false;
+  debugPrint("--- ✅ Consent Status: $hasConsented ---");
 
+  // 3. Initialize background services with error handling
+  debugPrint("--- 🔍 Initializing Notification Service ---");
+  try {
+    await NotificationService.init((payload) {
+      if (payload == "mood") {
+        navigatorKey.currentState?.push(
+          MaterialPageRoute(builder: (context) => const MoodInputScreen()),
+        );
+      }
+    });
+    debugPrint("--- ✅ Notification Service Ready ---");
+  } catch (e) {
+    debugPrint("--- ❌ Background Service Error: $e ---");
+  }
 
-  await NotificationService.init((payload) {
-    if (payload == "mood") {
-      navigatorKey.currentState?.push(
-        MaterialPageRoute(
-          builder: (context) => const MoodInputScreen(),
-        ),
-      );
-    }
-  });
-
-  runApp(const BehaviorMonitorApp()); // ✅ CORRECT
+  debugPrint("--- 🏁 Running App ---");
+  runApp(BehaviorMonitorApp(hasConsented: hasConsented));
 }
 
 class BehaviorMonitorApp extends StatelessWidget {
-  const BehaviorMonitorApp({super.key});
+  final bool hasConsented;
+  const BehaviorMonitorApp({super.key, required this.hasConsented});
 
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
       navigatorKey: navigatorKey,
-      title: "Behavior Monitor",
+      title: "MindMatrix",
       debugShowCheckedModeBanner: false,
       theme: ThemeData(
         primaryColor: const Color(0xFF4A90E2),
@@ -60,17 +67,14 @@ class BehaviorMonitorApp extends StatelessWidget {
         elevatedButtonTheme: ElevatedButtonThemeData(
           style: ElevatedButton.styleFrom(
             backgroundColor: const Color(0xFF4A90E2),
-            padding: const EdgeInsets.symmetric(
-              horizontal: 24,
-              vertical: 14,
-            ),
+            padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 14),
             shape: RoundedRectangleBorder(
               borderRadius: BorderRadius.circular(12),
             ),
           ),
         ),
       ),
-      home: const HomeScreen(),
+      home: hasConsented ? const HomeScreen() : const ConsentScreen(),
     );
   }
 }
