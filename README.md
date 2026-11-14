@@ -13,9 +13,18 @@
 
 ## 📸 Application Screenshots
 
+### 1. Central Behavioral Hub & Navigation
+<p align="center">
+  <img src="docs/screenshots/01_home_hub.jpg" width="850" alt="MindMatrix Central Behavioral Hub" />
+</p>
+<p align="center">
+  <em>Unified dashboard providing access to Daily Behavior tracking, Mood Check-ins, AI Stress Support, Stability Analysis, and Screen Monitoring.</em>
+</p>
+
+### 2. Core Functional Modules
 | Calculation Details & Mathematical Modeling | Daily Behavior Input Interface |
 | :---: | :---: |
-| <img src="docs/screenshots/04_calculation_details.png" width="480" alt="Calculation Details Hub" /> | <img src="docs/screenshots/05_daily_behavior_input.png" width="480" alt="Daily Behavior Input Interface" /> |
+| <img src="docs/screenshots/04_calculation_details.png" width="450" alt="Calculation Details Hub" /> | <img src="docs/screenshots/05_daily_behavior_input.png" width="450" alt="Daily Behavior Input Interface" /> |
 | **Mathematical Engine**<br/>Options for Daily Score calculation & Hankel Matrix / DMD analysis. | **Comprehensive Data Input**<br/>Activity tracking, lifestyle factors, circadian routine & screen usage. |
 
 ---
