@@ -1,6 +1,6 @@
-/// Deterministic crisis detection service for MindMatrix.
-/// This service uses keyword and phrase matching to identify potential 
-/// crisis signals related to self-harm or suicidal ideation.
+// Deterministic crisis detection service for MindMatrix.
+// This service uses keyword and phrase matching to identify potential 
+// crisis signals related to self-harm or suicidal ideation.
 
 class CrisisDetection {
   /// A fixed, pre-written response to show when a crisis message is detected.

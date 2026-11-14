@@ -15,7 +15,6 @@ class DailyScore {
     int routine = data['routine'] ?? 1;
     double screen = (data['screenTime'] ?? 0.0).toDouble();
     int calls = data['calls'] ?? 0;
-    double maxCall = (data['maxCallDuration'] ?? 0.0).toDouble();
 
     // 1. Sleep: Continuous smooth scoring
     // 0 hours = 0.0, 7-9 hours = 1.0, 12+ hours gradually decreases but never hits hard zero

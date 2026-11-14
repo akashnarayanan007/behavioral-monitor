@@ -126,7 +126,7 @@ class MentalStateService {
     }
 
     // BRANCH B: Multi-Day Analysis
-    int requested = dayRange ?? 7;
+    int requested = dayRange;
     int limit = requested.clamp(2, 10);
     if (limit > totalAvailable) {
       limit = totalAvailable; // Use the actual number of available days

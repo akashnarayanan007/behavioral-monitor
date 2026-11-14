@@ -1,7 +1,5 @@
 import 'package:flutter/material.dart';
 import '../database/database_service.dart';
-import '../analysis/hankel_matrix.dart';
-import '../analysis/dmd_analysis.dart';
 import '../analysis/daily_score.dart';
 import 'dart:async';
 import 'dart:math' as math;

@@ -13,11 +13,9 @@ class _MoodInputScreenState extends State<MoodInputScreen> {
   int selectedMood = 0;
 
   void saveMood() async {
-
     await DatabaseService.insertMood(selectedMood);
-
+    if (!mounted) return;
     Navigator.pop(context);
-
   }
 
   Widget moodCard(String emoji, String label, int value) {

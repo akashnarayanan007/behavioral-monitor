@@ -40,7 +40,6 @@ class _DailyStabilityScreenState extends State<DailyStabilityScreen> {
 
   Future<void> _generateAIInterpretation(Map<String, dynamic> entry) async {
     final double score = DailyScore.compute(entry);
-    final mentalState = MentalStateService.computeMentalState(entry);
 
     final String contextString = MentalStateService.generateStabilitySummary(
       stabilityIndex: score,
