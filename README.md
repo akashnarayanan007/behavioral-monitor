@@ -13,16 +13,9 @@
 
 ## 📸 Application Screenshots
 
-### 📱 Mobile Experience (Android)
-| Daily Behavioral Tracking | AI Stress Support Companion | Interactive Mood Check-in |
-| :---: | :---: | :---: |
-| <img src="docs/screenshots/01_daily_behavior_tracking.png" width="260" alt="Daily Behavioral Tracking" /> | <img src="docs/screenshots/02_ai_stress_chat.png" width="260" alt="AI Stress Support Chat" /> | <img src="docs/screenshots/03_mood_check.png" width="260" alt="Interactive Mood Check-in" /> |
-| **Multi-dimensional Metrics**<br/>Intuitive sliders for sleep, focus, screen time & daily habits. | **Confidential & Safe**<br/>Real-time empathetic chat with deterministic crisis detection. | **Affective Check-ins**<br/>Instant qualitative mood logging with visual feedback. |
-
-### 🌐 Web & Desktop Experience
 | Calculation Details & Mathematical Modeling | Daily Behavior Input Interface |
 | :---: | :---: |
-| <img src="docs/screenshots/04_calculation_details.png" width="450" alt="Calculation Details Hub" /> | <img src="docs/screenshots/05_daily_behavior_input.png" width="450" alt="Daily Behavior Input Interface" /> |
+| <img src="docs/screenshots/04_calculation_details.png" width="480" alt="Calculation Details Hub" /> | <img src="docs/screenshots/05_daily_behavior_input.png" width="480" alt="Daily Behavior Input Interface" /> |
 | **Mathematical Engine**<br/>Options for Daily Score calculation & Hankel Matrix / DMD analysis. | **Comprehensive Data Input**<br/>Activity tracking, lifestyle factors, circadian routine & screen usage. |
 
 ---
