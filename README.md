@@ -13,10 +13,10 @@
 
 ## 📸 Key Screenshots
 
-| 1. Privacy & Consent Architecture | 2. Central Behavioral Hub | 3. Stability Analytics & Insights |
+| 1. Daily Behavioral Tracking | 2. AI Stress Support Companion | 3. Interactive Mood Check-in |
 | :---: | :---: | :---: |
-| <img src="docs/screenshots/01_consent_screen.png" width="260" alt="Consent Screen" /> | <img src="docs/screenshots/02_home_dashboard.png" width="260" alt="Home Dashboard" /> | <img src="docs/screenshots/03_stability_analytics.png" width="260" alt="Stability Analytics" /> |
-| **Strict On-Device Privacy**<br/>Explicit consent gate keeping user data strictly local. | **Intuitive Hub**<br/>Seamless tracking across sleep, habits, moods, and AI support. | **Dynamic Mode Decomposition**<br/>Mathematical modeling & trend visualization. |
+| <img src="docs/screenshots/01_daily_behavior_tracking.png" width="260" alt="Daily Behavioral Tracking" /> | <img src="docs/screenshots/02_ai_stress_chat.png" width="260" alt="AI Stress Support Chat" /> | <img src="docs/screenshots/03_mood_check.png" width="260" alt="Interactive Mood Check-in" /> |
+| **Multi-dimensional Metrics**<br/>Intuitive sliders for sleep, focus, screen time & daily habits. | **Confidential & Safe**<br/>Real-time empathetic chat with deterministic crisis detection. | **Affective Check-ins**<br/>Instant qualitative mood logging with visual feedback. |
 
 ---
 
